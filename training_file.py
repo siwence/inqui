@@ -1,6 +1,8 @@
 import torch
+import numpy as np
 import random
 from cube_controller import DQN, ReplayBuffer 
+from environment import Environment
 
 def select_action(state, model, epsilon):
     if random.random() < epsilon:  # exploring
@@ -37,10 +39,10 @@ def train(env, model, optimizer, criterion, episodes=1000, batch_size=32):
                 states, actions, rewards, next_states, dones = zip(*experiences) # unpack sampled experiences
 
                 # converting the zipped experiences into tensors for neural network
-                states_tensor = torch.FloatTensor(states)
+                states_tensor = torch.FloatTensor(np.array(states))  # Convert to numpy array first
                 actions_tensor = torch.LongTensor(actions)
                 rewards_tensor = torch.FloatTensor(rewards)
-                next_states_tensor = torch.FloatTensor(next_states)
+                next_states_tensor = torch.FloatTensor(np.array(next_states))  # Convert to numpy array first
                 dones_tensor = torch.FloatTensor(dones)
 
                 # calculate q-values for actions taken in current states 
@@ -66,3 +68,8 @@ def train(env, model, optimizer, criterion, episodes=1000, batch_size=32):
         # decay epsilon
         if epsilon > min_epsilon:
             epsilon *= epsilon_decay
+        if touch:
+            print(f"Episode {episode + 1}/{episodes}, Total Reward: {total_reward}, Epsilon: {epsilon:.4f}, Touch: True")
+
+        else:
+            print(f"Episode {episode + 1}/{episodes}, Total Reward: {total_reward}, Epsilon: {epsilon:.4f}")
