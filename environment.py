@@ -4,6 +4,7 @@ import pybullet as p
 import pybullet_data
 import os
 import torch
+import time
 import torch.nn as nn
 from cube_controller import DQN, start_model
 from training_file import train
@@ -32,8 +33,10 @@ class Environment(gym.Env):
         self.cube = p.loadURDF("cube.urdf", basePosition=[0, 0, 0.05])
 
         # pressure plate location
-        self.plate_pos = [0, 0, 0.1]
-        self.plate = p.loadURDF("cube.urdf", basePosition=self.plate_pos, globalScaling=0.5)
+        self.plate_pos = [-2, 0, 0.1]
+        self.plate = p.loadURDF("cube.urdf", basePosition=self.plate_pos, globalScaling=0.5, useFixedBase = True) # makes it so that pressure plate cannot move
+
+        self.start_time = None # start time
 
         self.done = False 
         
@@ -45,10 +48,13 @@ class Environment(gym.Env):
         p.setGravity(0, 0, -9.81)
         self.plane_id = p.loadURDF("plane.urdf") 
         self.cube = p.loadURDF("cube.urdf", basePosition=[0, 0, 0.5], globalScaling=0.5)
-        self.plate_pos = [0, 0, 0.1]
-        self.plate = p.loadURDF("cube.urdf", basePosition=self.plate_pos, globalScaling=0.5)
+        self.plate_pos = [-2, 0, 0.1]
+        self.plate = p.loadURDF("cube.urdf", basePosition=self.plate_pos, globalScaling=0.5, useFixedBase = True)
+
+        self.start_time = time.time() # timer starts
 
         self.done = False
+
         return self.get_observation()
     
     def step(self, action): # xyz grid
@@ -71,11 +77,21 @@ class Environment(gym.Env):
         p.stepSimulation() 
 
         cube_pos = self.get_observation() # returns xyz coords of position
-        reward = 0
+        plate_pos = np.array(self.plate_pos)
 
-        if self.on_pressure_plate(np.array(cube_pos), np.array(self.plate_pos)):
-            reward = 1 # win condition
+        distance = np.linalg.norm(cube_pos - plate_pos) # distance formula
+
+        reward = -distance
+
+        if self.on_pressure_plate(np.array(cube_pos), plate_pos):
+            reward = 1000 # positive reinforcement
             self.done = True # done with the test
+
+        elapsed_time = time.time() - self.start_time
+
+        if elapsed_time > 5:
+            reward = -10  # penalty for failing
+            self.done = True  # End the episode
 
         return cube_pos, reward, self.done
     
@@ -83,6 +99,7 @@ class Environment(gym.Env):
     # distance formula to check if it's on the pressure plate
     def on_pressure_plate(self, cube_pos, plate_pos, threshold=0.25):
         distance_squared = (cube_pos[0] - plate_pos[0]) ** 2 + (cube_pos[1] - plate_pos[1]) ** 2
+        touch = true
         return distance_squared < threshold ** 2
     
     def get_observation(self):
